@@ -24,7 +24,7 @@ class CommCareAPIHandler:
         return f"{self.__class__.__name__}({', '.join(attribute_strings)})"
 
     def filepath(self, data_type):
-        return f"""{self.domain}/snowflake-copy/{data_type}-test/{self.event_time.strftime('%Y')}/{self.event_time.strftime('%m')}/{self.event_time.strftime('%d')}/{self.event_time.strftime('%H')}/"""
+        return f"""{self.domain}/snowflake-copy/{data_type}/{self.event_time.strftime('%Y')}/{self.event_time.strftime('%m')}/{self.event_time.strftime('%d')}/{self.event_time.strftime('%H')}/"""
 
     def api_base_url(self, data_type):
         return f"https://www.commcarehq.org/a/{self.domain}/api/{data_type['version']}/{data_type['name']}/"
@@ -43,7 +43,7 @@ class CommCareAPIHandler:
 
     # NOTE: needs memoization
     def _last_job_success_time_filepath(self, data_type_name):
-        return f"{self.domain}/snowflake-copy/{data_type_name}-test/last_successful_job_time.txt"
+        return f"{self.domain}/snowflake-copy/{data_type_name}/last_successful_job_time.txt"
 
     def get_initial_parameters_for_data_type(self, data_type):
         params = {
