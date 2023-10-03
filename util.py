@@ -1,7 +1,5 @@
 import boto3
-from config import parameter_store_base_url, api_tokens_param_names
-import requests
-
+from handler_config import parameter_store_base_url, api_tokens_param_names
 ssm_client = boto3.client('ssm')
 
 class APIError(Exception):

@@ -140,15 +140,46 @@ class CommCareAPIHandler:
 
     def pull_data_for_domain(self):
         for data_type_name in data_types.keys():
-            try:
-                self.pull_data(data_type_name)
-            except APIError as e:
-                print({
-                    "ERROR making request to API": str(e),
-                    "domain": self.domain,
-                    "data_type": data_type_name
-                })
-                self.APIErrorCount +=1
-                if self.APIErrorCount >= self.APIErrorMax:
-                    raise
-    
+            self._perform_method(self.pull_data, data_type_name)
+
+    def _perform_method(self, method, data_type_name):
+        try:
+            method(data_type_name)
+        except APIError as e:
+            print({
+                "ERROR making request to API": str(e),
+                "domain": self.domain,
+                "data_type": data_type_name
+            })
+            self.APIErrorCount +=1
+            if self.APIErrorCount >= self.APIErrorMax:
+                raise
+
+
+class CommCareAPIHandlerPush(CommCareAPIHandler):
+    def filepath(self, data_type, specifier):
+        return f"""{self.domain}/payload/{specifier}/{data_type}/{self.event_time.strftime('%Y')}/{self.event_time.strftime('%m')}/{self.event_time.strftime('%d')}/{self.event_time.strftime('%H')}/"""
+
+    def _get_post_content(self, data_type):
+        filename = 'case_data.json'
+        s3_object = s3.get_object(Bucket=main_bucket_name, Key=(self.filepath(data_type['name'], 'client')) + filename)
+        return s3_object['Body']
+
+    def _push_data(self, data_type):
+        print(f"Beginning data push of data type {data_type['name']} for domain: {self.domain}...")
+        api_url = self.api_base_url(data_type)
+        headers = {'Content-Type':'application/json', 'Authorization' : f'ApiKey {self.api_token}'}
+        body = self._get_post_content(data_type)
+
+        print(f"Making request to URL: {api_url} with data...")
+        print(body)
+        response = requests.get(api_url, headers=headers, data=body)
+        response_data = process_response(response)
+        print("Request successful.")
+        print(f"Form ID: {response_data.get('form_id')}")
+        print(response_data)
+
+        print("Processing finished.")
+
+    def push_data_for_domain(self, data_type_name):
+         self._perform_method(self._push_data, data_types[data_type_name])
