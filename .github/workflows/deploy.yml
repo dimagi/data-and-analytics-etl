@@ -1,0 +1,22 @@
+name: Create ZIP File and deploy to Lambda layer
+
+on:
+  push:
+    branches:
+    - deploy
+
+jobs:
+  create_zip:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Create ZIP
+        uses: vimtor/action-zip@v1.1
+        with:
+          files: /
+          dest: repo.zip
+      # - uses: actions/upload-artifact@v1
+      #   with:
+      #     name: repo_zipped
+      #     path: ${{ github.workspace }}/result.zip
