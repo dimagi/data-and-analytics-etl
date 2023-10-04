@@ -16,7 +16,7 @@ jobs:
         with:
           files: /
           dest: repo.zip
-      # - uses: actions/upload-artifact@v1
-      #   with:
-      #     name: repo_zipped
-      #     path: ${{ github.workspace }}/result.zip
+      - uses: actions/upload-artifact@v1
+        with:
+          name: repo_zipped
+          path: ${{ github.workspace }}/result.zip
