@@ -10,7 +10,7 @@ from util import APIError, process_response
 s3 = boto3.client('s3')
 
 class CommCareAPIHandler:
-    def __init__(self, domain, api_token_for_domain, event_time, request_limit=100):
+    def __init__(self, domain, api_token_for_domain, event_time, request_limit=100, test_mode=False):
         self.domain = domain
         self.api_token = api_token_for_domain
         self.event_time = event_time
@@ -18,16 +18,33 @@ class CommCareAPIHandler:
         self.request_limit = request_limit
         self.APIErrorCount = 0
         self.APIErrorMax = 3
+        self.test_mode = test_mode
 
     def __str__(self):
         attribute_strings = [f"{key}={value}" for key, value in vars(self).items()]
         return f"{self.__class__.__name__}({', '.join(attribute_strings)})"
 
-    def filepath(self, data_type):
-        return f"""{self.domain}/snowflake-copy/{data_type}/{self.event_time.strftime('%Y')}/{self.event_time.strftime('%m')}/{self.event_time.strftime('%d')}/{self.event_time.strftime('%H')}/"""
-
     def api_base_url(self, data_type):
         return f"https://www.commcarehq.org/a/{self.domain}/api/{data_type['version']}/{data_type['name']}/"
+
+    def _perform_method(self, method, data_type_name):
+        try:
+            method(data_type_name)
+        except APIError as e:
+            print({
+                "ERROR making request to API": str(e),
+                "domain": self.domain,
+                "data_type": data_type_name
+            })
+            self.APIErrorCount +=1
+            if self.APIErrorCount >= self.APIErrorMax:
+                raise
+
+
+class CommCareAPIHandlerPull(CommCareAPIHandler):
+
+    def filepath(self, data_type):
+        return f"{self.domain}/snowflake-copy/{data_type}" + ("-test" if self.test_mode else "") + f"/{self.event_time.strftime('%Y')}/{self.event_time.strftime('%m')}/{self.event_time.strftime('%d')}/{self.event_time.strftime('%H')}/"
 
     # NOTE: Needs memoization
     def _get_last_job_success_time(self, data_type_name):
@@ -43,7 +60,7 @@ class CommCareAPIHandler:
 
     # NOTE: needs memoization
     def _last_job_success_time_filepath(self, data_type_name):
-        return f"{self.domain}/snowflake-copy/{data_type_name}/last_successful_job_time.txt"
+        return f"{self.domain}/snowflake-copy/{data_type_name}" + ("-test" if self.test_mode else "") + "/last_successful_job_time.txt"
 
     def get_initial_parameters_for_data_type(self, data_type):
         params = {
@@ -141,20 +158,6 @@ class CommCareAPIHandler:
     def pull_data_for_domain(self):
         for data_type_name in data_types.keys():
             self._perform_method(self.pull_data, data_type_name)
-
-    def _perform_method(self, method, data_type_name):
-        try:
-            method(data_type_name)
-        except APIError as e:
-            print({
-                "ERROR making request to API": str(e),
-                "domain": self.domain,
-                "data_type": data_type_name
-            })
-            self.APIErrorCount +=1
-            if self.APIErrorCount >= self.APIErrorMax:
-                raise
-
 
 class CommCareAPIHandlerPush(CommCareAPIHandler):
     def filepath(self, data_type, specifier):
