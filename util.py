@@ -1,5 +1,4 @@
 import boto3
-from handler_config import parameter_store_base_url, api_tokens_param_names
 ssm_client = boto3.client('ssm')
 
 class APIError(Exception):
@@ -25,23 +24,9 @@ def get_value_from_parameter_store(param_name):
     return response['Parameter']['Value']
 
 def get_api_token(domain):
-    return get_value_from_parameter_store(api_tokens_param_names[domain])
+    param_name = domain + '-api-key'
+    return get_value_from_parameter_store(param_name)
 
 def put_value_parameter_store(param_name, param_value, overwrite=False):
     response = ssm_client.put_parameter(Name=param_name, Value=param_value, Overwrite=overwrite)
     process_response(response, is_boto=True)
-
-# def RequestLimiter():
-#     def __init__(self, max_requests=max_requests):
-#         self.max_requests = max_requests
-#         self.request_count = 0
-#         # self.period = period
-
-#     def execute_if_under_limit(self, request):
-#         if self.request_count < max_requests:
-#             return request()
-#         else:
-#             raise Exception("Request limit reached.")
-        
-        
-    

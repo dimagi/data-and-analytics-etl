@@ -1,12 +1,5 @@
 main_bucket_name = 'commcare-snowflake-data-sync'
 
-parameter_store_base_url = 'http://localhost:2773/systemsmanager/parameters'
-
-api_tokens_param_names = {
-    # domain: param_name
-    'co-carecoordination-dev': 'ush-dev-ops-analytics-test-api-key'
-}
-
 # Information and settings regarding the CC API for each data type 
 data_types = {
     'case': {
