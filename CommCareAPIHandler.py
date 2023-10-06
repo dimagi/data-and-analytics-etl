@@ -155,8 +155,9 @@ class CommCareAPIHandlerPull(CommCareAPIHandler):
         s3.put_object(Body=str(time), Bucket=main_bucket_name, Key=self._last_job_success_time_filepath(data_type_name))
         print(f"Run time saved.")
 
-    def pull_data_for_domain(self):
-        for data_type_name in data_types.keys():
+    def pull_data_for_domain(self, data_type_names=[], user_specified_start_time=None, user_specified_end_time=None):
+        # Allow specifying of which data types to pull, if user wants.
+        for data_type_name in (data_type_names or data_types.keys()):
             self._perform_method(self.pull_data, data_type_name)
 
 class CommCareAPIHandlerPush(CommCareAPIHandler):
