@@ -27,14 +27,14 @@ class CommCareAPIHandler:
     def api_base_url(self, data_type):
         return f"https://www.commcarehq.org/a/{self.domain}/api/{data_type['version']}/{data_type['name']}/"
 
-    def _perform_method(self, method, data_type_name):
+    def _perform_method(self, method, *args):
         try:
-            method(data_type_name)
+            method(*args)
         except APIError as e:
             print({
                 "ERROR making request to API": str(e),
                 "domain": self.domain,
-                "data_type": data_type_name
+                "data_type": args[0]
             })
             self.APIErrorCount +=1
             if self.APIErrorCount >= self.APIErrorMax:
@@ -185,5 +185,5 @@ class CommCareAPIHandlerPush(CommCareAPIHandler):
 
         print("Processing finished.")
 
-    def push_data_for_domain(self, data_type_name):
-         self._perform_method(self._push_data, data_types[data_type_name])
+    def push_data_for_domain(self, data_type_name, specifier):
+         self._perform_method(self._push_data, data_types[data_type_name], specifier)
