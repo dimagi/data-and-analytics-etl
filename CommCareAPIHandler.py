@@ -161,22 +161,24 @@ class CommCareAPIHandlerPull(CommCareAPIHandler):
             self._perform_method(self.pull_data, data_type_name)
 
 class CommCareAPIHandlerPush(CommCareAPIHandler):
-    def filepath(self, data_type, specifier):
-        return f"""{self.domain}/payload/{specifier}/{data_type}/{self.event_time.strftime('%Y')}/{self.event_time.strftime('%m')}/{self.event_time.strftime('%d')}/{self.event_time.strftime('%H')}/"""
+    def filepath(self, specifier):
+        path = f"""{self.domain}/payload/{specifier}/{self.event_time.strftime('%Y')}/{self.event_time.strftime('%m')}/{self.event_time.strftime('%d')}/{self.event_time.strftime('%H')}/"""
+        return path
 
-    def _get_post_content(self, data_type):
-        filename = 'case_data.json'
-        s3_object = s3.get_object(Bucket=main_bucket_name, Key=(self.filepath(data_type['name'], 'client')) + filename)
+    def _get_post_content(self, specifier):
+        filename = 'case_data'
+        full_path = self.filepath(specifier) + filename
+        print(f"S3 file path: {full_path}...")
+        s3_object = s3.get_object(Bucket=main_bucket_name, Key=full_path)
         return s3_object['Body']
 
-    def _push_data(self, data_type):
+    def _push_data(self, data_type, specifier):
         print(f"Beginning data push of data type {data_type['name']} for domain: {self.domain}...")
         api_url = self.api_base_url(data_type)
         headers = {'Content-Type':'application/json', 'Authorization' : f'ApiKey {self.api_token}'}
-        body = self._get_post_content(data_type)
+        print(f"Getting content to POST...")
+        body = self._get_post_content(specifier)
 
-        print(f"Making request to URL: {api_url} with data...")
-        print(body)
         response = requests.get(api_url, headers=headers, data=body)
         response_data = process_response(response)
         print("Request successful.")
