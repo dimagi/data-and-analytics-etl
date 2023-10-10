@@ -66,8 +66,8 @@ class CommCareAPIHandlerPull(CommCareAPIHandler):
         params = {
             'limit': data_type['limit']
         }
-        start_time = self._get_last_job_success_time(data_type['name'])
-        end_time = self.event_time.isoformat()
+        start_time = user_specified_start_time or self._get_last_job_success_time(data_type['name'])
+        end_time = user_specified_end_time or self.event_time.isoformat()
         if data_type.get('uses_indexed_on'):
             # v0.6
             # if data_type['name'] == 'case':
@@ -166,26 +166,37 @@ class CommCareAPIHandlerPush(CommCareAPIHandler):
         return path
 
     def _get_post_content(self, specifier):
-        filename = 'case_data'
-        full_path = self.filepath(specifier) + filename
+        full_path = self.filepath(specifier)
         print(f"S3 file path: {full_path}...")
-        s3_object = s3.get_object(Bucket=main_bucket_name, Key=full_path)
-        return s3_object['Body']
+        post_data_arr = []
+        # Parse all files in filepath, add each to post_data_arr as json
+        s3_objects_response = s3.list_objects(Bucket=main_bucket_name, Prefix=full_path)
+        for object_dict in s3_objects_response['Contents']:
+            obj = s3.get_object(Bucket=main_bucket_name, Key=object_dict['Key'])
+            post_data_arr.append(json.load(obj['Body']))
+        return post_data_arr
 
     def _push_data(self, data_type, specifier):
-        print(f"Beginning data push of data type {data_type['name']} for domain: {self.domain}...")
+        print(f"**Beginning data push of data type {data_type['name']} for domain: {self.domain}; specifier: {specifier}...")
         api_url = self.api_base_url(data_type)
         headers = {'Content-Type':'application/json', 'Authorization' : f'ApiKey {self.api_token}'}
         print(f"Getting content to POST...")
-        body = self._get_post_content(specifier)
+        post_data_arr = self._get_post_content(specifier)
+        print("Content loaded from S3.")
 
-        response = requests.get(api_url, headers=headers, data=body)
-        response_data = process_response(response)
-        print("Request successful.")
-        print(f"Form ID: {response_data.get('form_id')}")
-        print(response_data)
+        print(f"POSTing to url: {api_url}")
+        request_count = 1
+        for data in post_data_arr:
+            print(f"Making request #{request_count} of {len(post_data_arr)}...")
+            print(f"Data: {data}")
+            response = requests.post(api_url, headers=headers, json=data)
+            response_data = process_response(response)
+            print("POST successful.")
+            print(f"Form ID: {response_data.get('form_id')}")
+            print(f"Response data: {response_data}")
+            request_count += 1
 
-        print("Processing finished.")
+        print(f"**All requests done. Processing finished for domain {self.domain}; specifier: {specifier}.")
 
     def push_data_for_domain(self, data_type_name, specifier):
          self._perform_method(self._push_data, data_types[data_type_name], specifier)
