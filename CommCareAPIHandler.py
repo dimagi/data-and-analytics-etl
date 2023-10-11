@@ -171,7 +171,12 @@ class CommCareAPIHandlerPush(CommCareAPIHandler):
         post_data_arr = []
         # Parse all files in filepath, add each to post_data_arr as json
         s3_objects_response = s3.list_objects(Bucket=main_bucket_name, Prefix=full_path)
-        for object_dict in s3_objects_response['Contents']:
+        try:
+            folder_contents = s3_objects_response['Contents']
+        except KeyError:
+            print("Folder not found. Likely that the data is intentionally empty.")
+            return None
+        for object_dict in folder_contents:
             obj = s3.get_object(Bucket=main_bucket_name, Key=object_dict['Key'])
             post_data_arr.append(json.load(obj['Body']))
         return post_data_arr
@@ -182,6 +187,9 @@ class CommCareAPIHandlerPush(CommCareAPIHandler):
         headers = {'Content-Type':'application/json', 'Authorization' : f'ApiKey {self.api_token}'}
         print(f"Getting content to POST...")
         post_data_arr = self._get_post_content(specifier)
+        if not post_data_arr:
+            print("Ending processing of data push...")
+            return
         print("Content loaded from S3.")
 
         print(f"POSTing to url: {api_url}")
