@@ -123,7 +123,7 @@ class CommCareAPIHandlerPull(CommCareAPIHandler):
             print(f"|{data_type_name} count from request: {count}")
             limit = response_data['meta']['limit']
             assert data_type['limit'] == limit
-            if params['limit'] < count:
+            if data_type['limit'] < count:
                 if data_type.get('uses_indexed_on'):
                     last_item = response_data['objects'][limit - 1]
                     request_end_boundary = datetime.strptime(last_item['indexed_on'], "%Y-%m-%dT%H:%M:%S.%fZ").isoformat()
