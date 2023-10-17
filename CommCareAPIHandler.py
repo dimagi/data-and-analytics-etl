@@ -126,7 +126,10 @@ class CommCareAPIHandlerPull(CommCareAPIHandler):
             if data_type['limit'] < count:
                 if data_type.get('uses_indexed_on'):
                     last_item = response_data['objects'][limit - 1]
-                    request_end_boundary = datetime.strptime(last_item['indexed_on'], "%Y-%m-%dT%H:%M:%S.%fZ").isoformat()
+                    try:
+                        request_end_boundary = datetime.strptime(last_item['indexed_on'], "%Y-%m-%dT%H:%M:%S.%fZ").isoformat()
+                    except ValueError:
+                        request_end_boundary = datetime.strptime(last_item['indexed_on'], "%Y-%m-%dT%H:%M:%S.%f").isoformat()
                     params['indexed_on_start'] = request_end_boundary
                     print(f"Continuing to next page, with new indexed_on start: {request_end_boundary}...")
                 else:
