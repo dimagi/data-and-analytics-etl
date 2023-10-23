@@ -10,7 +10,7 @@ from util import APIError, process_response
 s3 = boto3.client('s3')
 
 class CommCareAPIHandler:
-    def __init__(self, domain, api_token_for_domain, event_time, request_limit=100, test_mode=False):
+    def __init__(self, domain, api_token_for_domain, event_time, request_limit=100, custom_date_range_config=None, test_mode=False):
         self.domain = domain
         self.api_token = api_token_for_domain
         self.event_time = event_time
@@ -18,6 +18,7 @@ class CommCareAPIHandler:
         self.request_limit = request_limit
         self.APIErrorCount = 0
         self.APIErrorMax = 3
+        self.custom_date_range_config = custom_date_range_config
         self.test_mode = test_mode
 
     def __str__(self):
@@ -44,7 +45,11 @@ class CommCareAPIHandler:
 class CommCareAPIHandlerPull(CommCareAPIHandler):
 
     def filepath(self, data_type):
-        return f"{self.domain}/snowflake-copy/{data_type}" + ("-test" if self.test_mode else "") + f"/{self.event_time.strftime('%Y')}/{self.event_time.strftime('%m')}/{self.event_time.strftime('%d')}/{self.event_time.strftime('%H')}/"
+        path_beginning = f"{self.domain}/snowflake-copy/"
+        if self.custom_date_range_config:
+            return path_beginning + self.custom_date_range_config.custom_folder_name + "/"
+        else:
+            return path_beginning + data_type + ("-test" if self.test_mode else "") + f"/{self.event_time.strftime('%Y')}/{self.event_time.strftime('%m')}/{self.event_time.strftime('%d')}/{self.event_time.strftime('%H')}/"
 
     # NOTE: Needs memoization
     def _get_last_job_success_time(self, data_type_name):
@@ -62,12 +67,17 @@ class CommCareAPIHandlerPull(CommCareAPIHandler):
     def _last_job_success_time_filepath(self, data_type_name):
         return f"{self.domain}/snowflake-copy/{data_type_name}" + ("-test" if self.test_mode else "") + "/last_successful_job_time.txt"
 
-    def get_initial_parameters_for_data_type(self, data_type):
+    def get_date_range(self, data_type):
+        if self.custom_date_range_config:
+            return (self.custom_date_range_config.start_time.isoformat(), self.custom_date_range_config.end_time.isoformat())
+        else:
+            return (self._get_last_job_success_time(data_type['name']), self.event_time.isoformat())
+
+    def get_initial_parameters_for_data_type(self, data_type, start_time, end_time):
         params = {
             'limit': data_type['limit']
         }
-        start_time = self._get_last_job_success_time(data_type['name'])
-        end_time = self.event_time.isoformat()
+
         if data_type.get('uses_indexed_on'):
             # v0.6
             # if data_type['name'] == 'case':
@@ -97,9 +107,10 @@ class CommCareAPIHandlerPull(CommCareAPIHandler):
         s3.put_object(Body=json.dumps(response_data), Bucket=main_bucket_name, Key=(self.filepath(cc_api_data_type['name']) + filename))
         print(f"{cc_api_data_type['name']} file stored.")
 
-    def pull_data(self, data_type_name):
-        data_type = data_types[data_type_name]
-        params = self.get_initial_parameters_for_data_type(data_type)
+    def pull_data(self, data_type):
+        data_type_name = data_type['name']
+        initial_start_time, initial_end_time = self.get_date_range(data_type)
+        params = self.get_initial_parameters_for_data_type(data_type, initial_start_time, initial_end_time)
         api_url = self.api_base_url(data_type)
         headers = {'Content-Type':'application/json', 'Authorization' : f'ApiKey {self.api_token}'}
     
@@ -209,5 +220,5 @@ class CommCareAPIHandlerPush(CommCareAPIHandler):
 
         print(f"**All requests done. Processing finished for domain {self.domain}; specifier: {specifier}.")
 
-    def push_data_for_domain(self, data_type_name, specifier):
-         self._perform_method(self._push_data, data_types[data_type_name], specifier)
+    def push_data_for_domain(self, data_type, specifier):
+         self._perform_method(self._push_data, data_type, specifier)
