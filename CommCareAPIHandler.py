@@ -51,19 +51,12 @@ class CommCareAPIHandlerPull(CommCareAPIHandler):
         else:
             return path_beginning + data_type + ("-test" if self.test_mode else "") + f"/{self.event_time.strftime('%Y')}/{self.event_time.strftime('%m')}/{self.event_time.strftime('%d')}/{self.event_time.strftime('%H')}/"
 
-    # NOTE: Needs memoization
     def _get_last_job_success_time(self, data_type_name):
         print(f"Loading last successful job time for {data_type_name} run on domain {self.domain}...")
-        try:
-            last_successful_job_time = s3.get_object(Bucket=main_bucket_name, Key=self._last_job_success_time_filepath(data_type_name))['Body'].read().decode("utf-8")
-        except ClientError as e:
-            if e.response['Error']['Code'] == 'NoSuchKey':
-                print("No last successful job time was provided via the txt file. Exiting...")
-            raise
+        last_successful_job_time = s3.get_object(Bucket=main_bucket_name, Key=self._last_job_success_time_filepath(data_type_name))['Body'].read().decode("utf-8")
         print("Load successful.")
         return last_successful_job_time
 
-    # NOTE: needs memoization
     def _last_job_success_time_filepath(self, data_type_name):
         return f"{self.domain}/snowflake-copy/{data_type_name}" + ("-test" if self.test_mode else "") + "/last_successful_job_time.txt"
 
@@ -79,12 +72,6 @@ class CommCareAPIHandlerPull(CommCareAPIHandler):
         }
 
         if data_type.get('uses_indexed_on'):
-            # v0.6
-            # if data_type['name'] == 'case':
-            #     params.update({
-            #         'indexed_on.gt': start_time,
-            #         'indexed_on.lt': end_time,
-            #     })
             if data_type['name'] == 'form':
                 params.update({
                     'include_archived': 'true',
@@ -100,6 +87,7 @@ class CommCareAPIHandlerPull(CommCareAPIHandler):
                     'UTC_start_time_start': start_time,
                     'UTC_start_time_end': end_time,
                 })
+
         return params
     
     def store_in_s3(self, cc_api_data_type, response_data, filename):
@@ -157,22 +145,26 @@ class CommCareAPIHandlerPull(CommCareAPIHandler):
                 filename = f"{data_type_name}_{indexed_on_start_of_last_request}_{request_end_boundary}.json"
             else:
                 data_type_request_count += 1
-                filename = f"{data_type_name}_{self._get_last_job_success_time(data_type_name)}_{self.event_time.isoformat()}_{data_type_request_count}.json"
+                filename = f"{data_type_name}_{initial_start_time}_{initial_end_time}_{data_type_request_count}.json"
             if count:
                 self.store_in_s3(data_type, response_data, filename)
     
         print(f"Data type {data_type_name} processing for domain: {self.domain} finished. API handler has made {self.request_count} requests in total.")
-        self._save_run_time(data_type_name, self.event_time.isoformat())
+        if not self.custom_date_range_config:
+            self._save_run_time(data_type_name, self.event_time.isoformat())
 
     def _save_run_time(self, data_type_name, time):
         print(f"Saving run time of {data_type_name} pull on domain {self.domain} with filename: {self._last_job_success_time_filepath(data_type_name)}...")
         s3.put_object(Body=str(time), Bucket=main_bucket_name, Key=self._last_job_success_time_filepath(data_type_name))
         print(f"Run time saved.")
 
-    def pull_data_for_domain(self, data_type_names=[]):
-        # Allow specifying of which data types to pull, if user wants.
-        for data_type_name in (data_type_names or data_types.keys()):
-            self._perform_method(self.pull_data, data_type_name)
+    def pull_data_for_domain(self, api_details):
+        for data_type_name in api_details.keys():
+            try:
+                self._perform_method(self.pull_data, api_details[data_type_name])
+            except ClientError as e:
+                if e.response['Error']['Code'] == 'NoSuchKey':
+                    print(f"No last successful job time was provided via the txt file. Skipping processing for data_type: {data_type_name}...")
 
 class CommCareAPIHandlerPush(CommCareAPIHandler):
     def filepath(self, specifier):
