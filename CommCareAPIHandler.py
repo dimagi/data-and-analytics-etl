@@ -1,11 +1,11 @@
 import boto3
 from botocore.exceptions import ClientError
-from handler_config import main_bucket_name, data_types
 from datetime import datetime
 import json
-
 import requests
 from util import APIError, process_response
+
+main_bucket_name = 'commcare-snowflake-data-sync'
 
 s3 = boto3.client('s3')
 
