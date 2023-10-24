@@ -8,7 +8,7 @@ from util import (
 )
 
 # Date format: %Y-%m-%dT%H:%M:%S.%fZ
-DateRangeTuple = namedtuple('DateRangeTuple', ['start_time', 'end_time', 'custom_folder_name'])
+DateRangeTuple = namedtuple('DateRangeTuple', ['start_time', 'end_time'])
 
 def err(msg):
     return {
@@ -41,7 +41,7 @@ def lambda_handler(event, context):
         if 'custom_date_range' in event:
             custom_date_range_config = event['custom_date_range']
             custom_date_range_tuple = DateRangeTuple(datetime.strptime(custom_date_range_config['start_time'], "%Y-%m-%dT%H:%M:%S.%fZ"),
-                datetime.strptime(custom_date_range_config['end_time'], "%Y-%m-%dT%H:%M:%S.%fZ"), custom_date_range_config['custom_folder_name'])
+                datetime.strptime(custom_date_range_config['end_time'], "%Y-%m-%dT%H:%M:%S.%fZ"))
             print(f"Specific date range specified. Details: {custom_date_range_tuple}")
         else:
             custom_date_range_tuple = None
