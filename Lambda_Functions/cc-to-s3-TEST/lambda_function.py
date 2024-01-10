@@ -1,14 +1,18 @@
 from collections import namedtuple
 from datetime import datetime
 import json
+import os
+# from botocore.vendored import requests
 
 from CommCareAPIHandler import CommCareAPIHandlerPull, CommCareAPIHandlerPush
 from util import (
+    get_value_from_parameter_store,
     get_api_token,
+    put_value_parameter_store
 )
 
 # Date format: %Y-%m-%dT%H:%M:%S.%fZ
-DateRangeTuple = namedtuple('DateRangeTuple', ['start_time', 'end_time'])
+DateRangeTuple = namedtuple('DateRangeTuple', ['start_time', 'end_time', 'custom_folder_name'])
 
 def err(msg):
     return {
@@ -41,7 +45,7 @@ def lambda_handler(event, context):
         if 'custom_date_range' in event:
             custom_date_range_config = event['custom_date_range']
             custom_date_range_tuple = DateRangeTuple(datetime.strptime(custom_date_range_config['start_time'], "%Y-%m-%dT%H:%M:%S.%fZ"),
-                datetime.strptime(custom_date_range_config['end_time'], "%Y-%m-%dT%H:%M:%S.%fZ"))
+                datetime.strptime(custom_date_range_config['end_time'], "%Y-%m-%dT%H:%M:%S.%fZ"), custom_date_range_config['custom_folder_name'])
             print(f"Specific date range specified. Details: {custom_date_range_tuple}")
         else:
             custom_date_range_tuple = None
