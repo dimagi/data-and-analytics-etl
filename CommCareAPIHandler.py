@@ -46,10 +46,7 @@ class CommCareAPIHandlerPull(CommCareAPIHandler):
 
     def filepath(self, data_type):
         path_beginning = f"{self.domain}/snowflake-copy/"
-        if self.custom_date_range_config:
-            return path_beginning + self.custom_date_range_config.custom_folder_name + "/"
-        else:
-            return path_beginning + data_type + ("-test" if self.test_mode else "") + f"/{self.event_time.strftime('%Y')}/{self.event_time.strftime('%m')}/{self.event_time.strftime('%d')}/{self.event_time.strftime('%H')}/"
+        return path_beginning + data_type + ("-test" if self.test_mode else "") + f"/{self.event_time.strftime('%Y')}/{self.event_time.strftime('%m')}/{self.event_time.strftime('%d')}/{self.event_time.strftime('%H')}/"
 
     def _get_last_job_success_time(self, data_type_name):
         print(f"Loading last successful job time for {data_type_name} run on domain {self.domain}...")
