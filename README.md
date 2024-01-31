@@ -12,20 +12,20 @@ To run all tests, in the main directory run:
 `py -m unittest`
 
 To run tests from a specific file, run:
-`py -m unittest Testing/{file_path}.py`
+`py -m unittest testing/{file_path}.py`
 
 To run tests from a specific class within a file, run:
-`py -m unittest Testing.{file_path}.{class_name}`
+`py -m unittest testing.{file_path}.{class_name}`
 
 To run a specific test, run:
-`py -m unittest Testing.{file_path}.{class_name}.{test_name}`
+`py -m unittest testing.{file_path}.{class_name}.{test_name}`
 
 ## Creating new tests
-All new tests should be created in a uniform way to make understanding them easier.  First, all test files should be created in the Testing folder or a subfolder of it and have a file name in the format of `tests_{name}.py`.  Next, tests need to be implemented as functions in a class inheriting from `unittest.TestCase`. Finally, tests should make sure to implement the proper mocks to run properly, and use functions from `Testing/util.py` as needed.  A common structure that many current tests take the form of is the following:
+All new tests should be created in a uniform way to make understanding them easier.  First, all test files should be created in the Testing folder or a subfolder of it and have a file name in the format of `tests_{name}.py`.  Next, tests need to be implemented as functions in a class inheriting from `unittest.TestCase`. Finally, tests should make sure to implement the proper mocks to run properly, and use functions from `testing/util.py` as needed.  A common structure that many current tests take the form of is the following:
 
 ```
 import unittest
-from Testing.util import run_test_cases
+from testing.util import run_test_cases
 ...
 
 {implement mocks here}

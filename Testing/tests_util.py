@@ -4,7 +4,7 @@ import unittest
 import unittest.mock
 
 from unittest.mock import MagicMock
-from Testing.util import (
+from testing.util import (
     MockResponse,
     generate_get_boto3_client_mock_function,
     run_test_cases

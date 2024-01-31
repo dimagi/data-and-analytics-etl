@@ -1,4 +1,4 @@
-from Testing.util import MockResponse
+from testing.util import MockResponse
 
 
 def mock_get(url, headers, params):

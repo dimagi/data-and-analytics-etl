@@ -5,7 +5,7 @@ import unittest.mock
 
 from datetime import datetime
 from unittest.mock import MagicMock
-from Testing.util import (
+from testing.util import (
     generate_get_boto3_client_mock_function,
     run_test_cases
 )

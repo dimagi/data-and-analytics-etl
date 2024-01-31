@@ -1,4 +1,4 @@
-from Testing.boto3_mock import Boto3ClientMock
+from testing.boto3_mock import Boto3ClientMock
 
 
 def fake_json_file_load(json_data):

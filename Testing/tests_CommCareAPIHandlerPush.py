@@ -7,8 +7,8 @@ import unittest.mock
 
 from datetime import datetime
 from unittest.mock import MagicMock
-from Testing.requests_mock import mock_get, mock_post
-from Testing.util import (
+from testing.requests_mock import mock_get, mock_post
+from testing.util import (
     fake_json_file_load,
     generate_get_boto3_client_mock_function,
     run_test_cases
