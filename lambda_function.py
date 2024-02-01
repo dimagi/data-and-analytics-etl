@@ -11,6 +11,8 @@ from util import (
 DateRangeTuple = namedtuple('DateRangeTuple', ['start_time', 'end_time'])
 
 def err(msg):
+    print(f"Error: {msg}")
+    exit()
     return {
             'statusCode': 400,
             'body': json.dumps({'message': msg})
@@ -28,7 +30,7 @@ def lambda_handler(event, context):
     print("Got API token for domain.")
     
     if 'operation_type' not in event:
-        return err('Error: operation type was not specified in event data.')
+        return err('Operation type was not specified in event data.')
 
     test_mode = False
     if 'test_mode' in event:
@@ -47,7 +49,7 @@ def lambda_handler(event, context):
             custom_date_range_tuple = None
         
         if 'api_info' not in event:
-            return err('Error: api_details was missing in event data.')
+            return err('api_details was missing in event data.')
     
         CommCareAPIHandlerPull(domain, api_token_for_domain, event_time, request_limit=1000,
             custom_date_range_config=custom_date_range_tuple, test_mode=test_mode).pull_data_for_domain(event['api_info'])
@@ -61,7 +63,7 @@ def lambda_handler(event, context):
     ## -- CommCare to S3
     elif event['operation_type'] == 's3_to_cc':
         if 'api_info' not in event or 'specifiers' not in event:
-            return err('Error: api_info or specifiers were missing in event data.')
+            return err('api_info or specifiers were missing in event data.')
         specifiers = event['specifiers']
         for specifier in specifiers:
             api_token_for_domain = get_api_token(domain, specifier=specifier)
