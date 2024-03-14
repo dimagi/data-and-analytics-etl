@@ -62,12 +62,12 @@ def lambda_handler(event, context):
 
     ## -- CommCare to S3
     elif event['operation_type'] == 's3_to_cc':
-        if 'api_info' not in event or 'specifiers' not in event:
-            return err('api_info or specifiers were missing in event data.')
-        specifiers = event['specifiers']
-        for specifier in specifiers:
+        if 'specifiers' not in event:
+            return err('"specifiers" were missing in event data.')
+        specifier_data = event['specifiers']
+        for specifier in specifier_data:
             api_token_for_domain = get_api_token(domain, specifier=specifier)
-            CommCareAPIHandlerPush(domain, api_token_for_domain, event_time, request_limit=1000, test_mode=test_mode).push_data_for_domain(event['api_info'], specifier)
+            CommCareAPIHandlerPush(domain, api_token_for_domain, event_time, request_limit=1000, test_mode=test_mode).push_data_for_domain(specifier_data[specifier], specifier)
 
         print(f"Data push for domain: {domain} finished.")
         return {

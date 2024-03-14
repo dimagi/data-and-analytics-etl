@@ -172,10 +172,10 @@ class CommCareAPIHandlerPush(CommCareAPIHandler):
         path = f"""{self.domain}/payload/{specifier}/{self.event_time.strftime('%Y')}/{self.event_time.strftime('%m')}/{self.event_time.strftime('%d')}/{self.event_time.strftime('%H')}/"""
         return path
 
-    def _get_post_content(self, specifier):
+    def _get_request_content(self, specifier):
         full_path = self.filepath(specifier)
         print(f"S3 file path: {full_path}...")
-        post_data_arr = []
+        request_data_arr = []
         # Parse all files in filepath, add each to post_data_arr as json
         s3_objects_response = s3.list_objects(Bucket=main_bucket_name, Prefix=full_path)
         try:
@@ -185,32 +185,40 @@ class CommCareAPIHandlerPush(CommCareAPIHandler):
             return None
         for object_dict in folder_contents:
             obj = s3.get_object(Bucket=main_bucket_name, Key=object_dict['Key'])
-            post_data_arr.append(json.load(obj['Body']))
-        return post_data_arr
+            if not obj['ContentLength']:
+                print("WARNING: Found an empty object in folder. This is normal if you created the folder manually in the AWS console.")
+                continue
+            request_data_arr.append(json.load(obj['Body']))
+        return request_data_arr
+
+    def _make_request(self, data, data_type_name, api_url, request_method):
+        print(f"Data: {data}")
+        response = requests.request(request_method, api_url, headers=self.api_call_headers(), json=data)
+        response_data = process_response(response)
+        print(f"{request_method} successful.")
+        if data_type_name == CASE:
+            print(f"Form ID: {response_data.get('form_id')}")
+        print(f"Response data: {response_data}")
 
     def _push_data(self, data_type, specifier):
-        print(f"**Beginning data push of data type {data_type['name']} for domain: {self.domain}; specifier: {specifier}...")
+        data_type_name = data_type['name']
+        print(f"**Beginning data push of data type {data_type_name} for domain: {self.domain}; specifier: {specifier}...")
         api_url = self.api_base_url(data_type)
-        headers = {'Content-Type':'application/json', 'Authorization' : f'ApiKey {self.api_token}'}
-        print(f"Getting content to POST...")
-        post_data_arr = self._get_post_content(specifier)
-        if not post_data_arr:
-            print("Ending processing of data push...")
+
+        print(f"Getting data to inculde in request...")
+        request_data_arr = self._get_request_content(specifier)
+        if not request_data_arr:
+            print("Could not find S3 data. Ending processing of data push...")
             return
         print("Content loaded from S3.")
 
-        print(f"POSTing to url: {api_url}")
+        print(f"Starting requests to url: {api_url}")
         request_count = 1
-        for data in post_data_arr:
-            print(f"Making request #{request_count} of {len(post_data_arr)}...")
-            print(f"Data: {data}")
-            response = requests.post(api_url, headers=headers, json=data)
-            response_data = process_response(response)
-            print("POST successful.")
-            print(f"Form ID: {response_data.get('form_id')}")
-            print(f"Response data: {response_data}")
+        request_method = data_type['method']
+        for data in request_data_arr:
+            print(f"Making {request_method} request #{request_count} of {len(request_data_arr)}...")
+            self._make_request(data, data_type_name, api_url, request_method)
             request_count += 1
-
         print(f"**All requests done. Processing finished for domain {self.domain}; specifier: {specifier}.")
 
     def push_data_for_domain(self, data_type, specifier):
