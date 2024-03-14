@@ -116,15 +116,14 @@ class CommCareAPIHandlerPull(CommCareAPIHandler):
                 raise Exception(f"Request limit reached for API Handler: {self}.")
             response_data = process_response(response)
             print(f"Request successful.")
-    
+
+            ## Prepare next request (if needed)
             if data_type.get('uses_indexed_on'):
                 indexed_on_start_of_last_request = params.get('indexed_on_start')
-            count = response_data['meta']['total_count']
-            print(f"|{data_type_name} count from request: {count}")
-            limit = response_data['meta']['limit']
-            assert data_type['limit'] == limit
-            if data_type['limit'] < count:
+            if response_data['meta']['next']:
                 if data_type.get('uses_indexed_on'):
+                    limit = response_data['meta']['limit']
+                    assert data_type['limit'] == limit
                     last_item = response_data['objects'][limit - 1]
                     try:
                         request_end_boundary = datetime.strptime(last_item['indexed_on'], "%Y-%m-%dT%H:%M:%S.%fZ").isoformat()
@@ -141,13 +140,14 @@ class CommCareAPIHandlerPull(CommCareAPIHandler):
                     request_end_boundary = params.get('indexed_on_end')
                 more_items_remain = False
                 print(f"Reached end of {data_type_name} pagination.")
-    
+
+            ## Put data in S3
             if data_type.get('uses_indexed_on'):
                 filename = f"{data_type_name}_{indexed_on_start_of_last_request}_{request_end_boundary}.json"
             else:
                 data_type_request_count += 1
                 filename = f"{data_type_name}_{initial_start_time}_{initial_end_time}_{data_type_request_count}.json"
-            if count:
+            if len(response_data['objects']):
                 self.store_in_s3(data_type, response_data, filename)
     
         print(f"Data type {data_type_name} processing for domain: {self.domain} finished. API handler has made {self.request_count} requests in total.")
