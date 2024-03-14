@@ -29,6 +29,9 @@ class CommCareAPIHandler:
     def api_base_url(self, data_type):
         return f"https://www.commcarehq.org/a/{self.domain}/api/{data_type['version']}/{data_type['name']}/"
 
+    def api_call_headers(self):
+        return {'Content-Type':'application/json', 'Authorization' : f'ApiKey {self.api_token}'}
+
     def _perform_method(self, method, *args):
         try:
             method(*args)
@@ -98,16 +101,16 @@ class CommCareAPIHandlerPull(CommCareAPIHandler):
         initial_start_time, initial_end_time = self.get_date_range(data_type)
         params = self.get_initial_parameters_for_data_type(data_type, initial_start_time, initial_end_time)
         api_url = self.api_base_url(data_type)
-        headers = {'Content-Type':'application/json', 'Authorization' : f'ApiKey {self.api_token}'}
     
         print(f"Starting {data_type_name} processing for domain: {self.domain}. Storing in bucket: {main_bucket_name} with filepath: {self.filepath(data_type_name)}.")
         more_items_remain = True
         if not data_type.get('uses_indexed_on'):
             data_type_request_count = 0 # Record request count to add to filename if needed
         while more_items_remain:
+            ## Make request
             print(f"Making request to URL: {api_url} with parameters: {params}.")
             if self.request_count < self.request_limit:
-                response = requests.get(api_url, headers=headers, params=params)
+                response = requests.get(api_url, headers=self.api_call_headers(), params=params)
                 self.request_count += 1
             else:
                 raise Exception(f"Request limit reached for API Handler: {self}.")
