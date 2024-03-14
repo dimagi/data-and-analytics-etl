@@ -66,6 +66,7 @@ class Boto3ClientMock():
                     'ResponseMetadata': {
                         'HTTPStatusCode': 200
                     },
+                    'ContentLength': 2,
                     'Key': record['Key'],
                     'Body': record['Body']
                 }

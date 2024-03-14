@@ -7,7 +7,7 @@ import unittest.mock
 
 from datetime import datetime
 from unittest.mock import MagicMock
-from testing.requests_mock import mock_get, mock_post
+from testing.requests_mock import mock_get, mock_request
 from testing.util import (
     fake_json_file_load,
     generate_get_boto3_client_mock_function,
@@ -29,7 +29,7 @@ get_boto3_client_mock = generate_get_boto3_client_mock_function(
 
 boto3.client = MagicMock(side_effect=get_boto3_client_mock)
 requests.get = MagicMock(side_effect=mock_get)
-requests.post = MagicMock(side_effect=mock_post)
+requests.post = MagicMock(side_effect=mock_request)
 json.load = MagicMock(side_effect=fake_json_file_load)
 
 import CommCareAPIHandler
