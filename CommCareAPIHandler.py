@@ -3,6 +3,7 @@ from botocore.exceptions import ClientError
 from datetime import datetime
 import json
 import requests
+from const import CASE
 from util import APIError, process_response
 
 main_bucket_name = 'commcare-snowflake-data-sync'

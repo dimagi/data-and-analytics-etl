@@ -1,0 +1,2 @@
+CASE = 'case'
+POST = 'POST'
