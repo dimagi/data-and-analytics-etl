@@ -23,10 +23,7 @@ def lambda_handler(event, context):
 
     # Load domain passed in by Eventbridge
     domain = event['domain']
-
     print(f"Processing domain: {domain}...")
-    api_token_for_domain = get_api_token(domain)
-    print("Got API token for domain.")
     
     if 'operation_type' not in event:
         return err('Operation type was not specified in event data.')
@@ -37,6 +34,9 @@ def lambda_handler(event, context):
 
     ## -- S3 to CommCare
     if event['operation_type'] == 'cc_to_s3':
+
+        api_token_for_domain = get_api_token(domain)
+        print("Got API token for domain.")
 
         # Custom date range processing
         if 'custom_date_range' in event:
