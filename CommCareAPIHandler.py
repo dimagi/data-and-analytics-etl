@@ -3,6 +3,7 @@ from botocore.exceptions import ClientError
 from datetime import datetime
 import json
 import requests
+from const import CASE
 from util import APIError, process_response
 
 main_bucket_name = 'commcare-snowflake-data-sync'
@@ -27,6 +28,9 @@ class CommCareAPIHandler:
 
     def api_base_url(self, data_type):
         return f"https://www.commcarehq.org/a/{self.domain}/api/{data_type['version']}/{data_type['name']}/"
+
+    def api_call_headers(self):
+        return {'Content-Type':'application/json', 'Authorization' : f'ApiKey {self.api_token}'}
 
     def _perform_method(self, method, *args):
         try:
@@ -97,30 +101,29 @@ class CommCareAPIHandlerPull(CommCareAPIHandler):
         initial_start_time, initial_end_time = self.get_date_range(data_type)
         params = self.get_initial_parameters_for_data_type(data_type, initial_start_time, initial_end_time)
         api_url = self.api_base_url(data_type)
-        headers = {'Content-Type':'application/json', 'Authorization' : f'ApiKey {self.api_token}'}
     
         print(f"Starting {data_type_name} processing for domain: {self.domain}. Storing in bucket: {main_bucket_name} with filepath: {self.filepath(data_type_name)}.")
         more_items_remain = True
         if not data_type.get('uses_indexed_on'):
             data_type_request_count = 0 # Record request count to add to filename if needed
         while more_items_remain:
+            ## Make request
             print(f"Making request to URL: {api_url} with parameters: {params}.")
             if self.request_count < self.request_limit:
-                response = requests.get(api_url, headers=headers, params=params)
+                response = requests.get(api_url, headers=self.api_call_headers(), params=params)
                 self.request_count += 1
             else:
                 raise Exception(f"Request limit reached for API Handler: {self}.")
             response_data = process_response(response)
             print(f"Request successful.")
-    
+
+            ## Prepare next request (if needed)
             if data_type.get('uses_indexed_on'):
                 indexed_on_start_of_last_request = params.get('indexed_on_start')
-            count = response_data['meta']['total_count']
-            print(f"|{data_type_name} count from request: {count}")
-            limit = response_data['meta']['limit']
-            assert data_type['limit'] == limit
-            if data_type['limit'] < count:
+            if response_data['meta']['next']:
                 if data_type.get('uses_indexed_on'):
+                    limit = response_data['meta']['limit']
+                    assert data_type['limit'] == limit
                     last_item = response_data['objects'][limit - 1]
                     try:
                         request_end_boundary = datetime.strptime(last_item['indexed_on'], "%Y-%m-%dT%H:%M:%S.%fZ").isoformat()
@@ -137,13 +140,14 @@ class CommCareAPIHandlerPull(CommCareAPIHandler):
                     request_end_boundary = params.get('indexed_on_end')
                 more_items_remain = False
                 print(f"Reached end of {data_type_name} pagination.")
-    
+
+            ## Put data in S3
             if data_type.get('uses_indexed_on'):
                 filename = f"{data_type_name}_{indexed_on_start_of_last_request}_{request_end_boundary}.json"
             else:
                 data_type_request_count += 1
                 filename = f"{data_type_name}_{initial_start_time}_{initial_end_time}_{data_type_request_count}.json"
-            if count:
+            if len(response_data['objects']):
                 self.store_in_s3(data_type, response_data, filename)
     
         print(f"Data type {data_type_name} processing for domain: {self.domain} finished. API handler has made {self.request_count} requests in total.")
@@ -168,10 +172,10 @@ class CommCareAPIHandlerPush(CommCareAPIHandler):
         path = f"""{self.domain}/payload/{specifier}/{self.event_time.strftime('%Y')}/{self.event_time.strftime('%m')}/{self.event_time.strftime('%d')}/{self.event_time.strftime('%H')}/"""
         return path
 
-    def _get_post_content(self, specifier):
+    def _get_request_content(self, specifier):
         full_path = self.filepath(specifier)
         print(f"S3 file path: {full_path}...")
-        post_data_arr = []
+        request_data_arr = []
         # Parse all files in filepath, add each to post_data_arr as json
         s3_objects_response = s3.list_objects(Bucket=main_bucket_name, Prefix=full_path)
         try:
@@ -181,32 +185,40 @@ class CommCareAPIHandlerPush(CommCareAPIHandler):
             return None
         for object_dict in folder_contents:
             obj = s3.get_object(Bucket=main_bucket_name, Key=object_dict['Key'])
-            post_data_arr.append(json.load(obj['Body']))
-        return post_data_arr
+            if not obj['ContentLength']:
+                print("WARNING: Found an empty object in folder. This is normal if you created the folder manually in the AWS console.")
+                continue
+            request_data_arr.append(json.load(obj['Body']))
+        return request_data_arr
+
+    def _make_request(self, data, data_type_name, api_url, request_method):
+        print(f"Data: {data}")
+        response = requests.request(request_method, api_url, headers=self.api_call_headers(), json=data)
+        response_data = process_response(response)
+        print(f"{request_method} successful.")
+        if data_type_name == CASE:
+            print(f"Form ID: {response_data.get('form_id')}")
+        print(f"Response data: {response_data}")
 
     def _push_data(self, data_type, specifier):
-        print(f"**Beginning data push of data type {data_type['name']} for domain: {self.domain}; specifier: {specifier}...")
+        data_type_name = data_type['name']
+        print(f"**Beginning data push of data type {data_type_name} for domain: {self.domain}; specifier: {specifier}...")
         api_url = self.api_base_url(data_type)
-        headers = {'Content-Type':'application/json', 'Authorization' : f'ApiKey {self.api_token}'}
-        print(f"Getting content to POST...")
-        post_data_arr = self._get_post_content(specifier)
-        if not post_data_arr:
-            print("Ending processing of data push...")
+
+        print(f"Getting data to inculde in request...")
+        request_data_arr = self._get_request_content(specifier)
+        if not request_data_arr:
+            print("Could not find S3 data. Ending processing of data push...")
             return
         print("Content loaded from S3.")
 
-        print(f"POSTing to url: {api_url}")
+        print(f"Starting requests to url: {api_url}")
         request_count = 1
-        for data in post_data_arr:
-            print(f"Making request #{request_count} of {len(post_data_arr)}...")
-            print(f"Data: {data}")
-            response = requests.post(api_url, headers=headers, json=data)
-            response_data = process_response(response)
-            print("POST successful.")
-            print(f"Form ID: {response_data.get('form_id')}")
-            print(f"Response data: {response_data}")
+        request_method = data_type['method']
+        for data in request_data_arr:
+            print(f"Making {request_method} request #{request_count} of {len(request_data_arr)}...")
+            self._make_request(data, data_type_name, api_url, request_method)
             request_count += 1
-
         print(f"**All requests done. Processing finished for domain {self.domain}; specifier: {specifier}.")
 
     def push_data_for_domain(self, data_type, specifier):

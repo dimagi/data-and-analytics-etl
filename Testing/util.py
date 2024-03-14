@@ -27,7 +27,7 @@ def run_test_cases(self, test_data, test_function):
                 test_function(self, test_case)
                 self.assertFalse(test_case['expect_exception'])
             except Exception as e:
-                self.assertTrue(test_case['expect_exception'])
+                self.assertTrue(test_case['expect_exception'], msg=str(e))
                 self.assertEqual(str(test_case['exception']), str(e))
 
 
