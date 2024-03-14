@@ -12,7 +12,6 @@ DateRangeTuple = namedtuple('DateRangeTuple', ['start_time', 'end_time'])
 
 def err(msg):
     print(f"Error: {msg}")
-    exit()
     return {
             'statusCode': 400,
             'body': json.dumps({'message': msg})
