@@ -7,6 +7,7 @@ import unittest.mock
 
 from datetime import datetime
 from unittest.mock import MagicMock
+from testing.const import POST
 from testing.requests_mock import mock_get, mock_request
 from testing.util import (
     fake_json_file_load,
@@ -161,7 +162,7 @@ class TestCommCareAPIHandlerPush(unittest.TestCase):
                 'name': 'test_specifier_1',
                 'parameters': {
                     'data_type': {
-                        'method': 'POST',
+                        'method': POST,
                         'version': 'test_version',
                         'name': 'test_name'
                     },
@@ -174,7 +175,7 @@ class TestCommCareAPIHandlerPush(unittest.TestCase):
                 'name': 'test_specifier_2',
                 'parameters': {
                     'data_type': {
-                        'method': 'POST',
+                        'method': POST,
                         'version': 'test_version',
                         'name': 'test_name'
                     },
@@ -187,7 +188,7 @@ class TestCommCareAPIHandlerPush(unittest.TestCase):
                 'name': 'test_specifier_missing',
                 'parameters': {
                     'data_type': {
-                        'method': 'POST',
+                        'method': POST,
                         'version': 'test_version',
                         'name': 'test_name'
                     },
@@ -213,7 +214,7 @@ class TestCommCareAPIHandlerPush(unittest.TestCase):
                 'name': 'test_specifier_1',
                 'parameters': {
                     'data_type': {
-                        'method': 'POST',
+                        'method': POST,
                         'version': 'test_version',
                         'name': 'test_name'
                     },
@@ -239,7 +240,7 @@ class TestCommCareAPIHandlerPush(unittest.TestCase):
                 'name': 'test_specifier_missing',
                 'parameters': {
                     'data_type': {
-                        'method': 'POST',
+                        'method': POST,
                         'version': 'test_version',
                         'name': 'test_name'
                     },

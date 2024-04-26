@@ -1,2 +1,1 @@
 CASE = 'case'
-POST = 'POST'
