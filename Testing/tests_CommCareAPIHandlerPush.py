@@ -7,7 +7,8 @@ import unittest.mock
 
 from datetime import datetime
 from unittest.mock import MagicMock
-from testing.requests_mock import mock_get, mock_post
+from testing.const import POST
+from testing.requests_mock import mock_get, mock_request
 from testing.util import (
     fake_json_file_load,
     generate_get_boto3_client_mock_function,
@@ -56,7 +57,7 @@ get_boto3_client_mock = generate_get_boto3_client_mock_function(
 
 boto3.client = MagicMock(side_effect=get_boto3_client_mock)
 requests.get = MagicMock(side_effect=mock_get)
-requests.post = MagicMock(side_effect=mock_post)
+requests.request = MagicMock(side_effect=mock_request)
 json.load = MagicMock(side_effect=fake_json_file_load)
 
 import CommCareAPIHandler
@@ -102,8 +103,8 @@ class TestCommCareAPIHandlerPush(unittest.TestCase):
 
         run_test_cases(self, test_data, test_function)
 
-    def test_commcareapihandlerpush_get_post_content(self):
-        print('*** Running test_commcareapihandlerpush_get_post_content ***')
+    def test_commcareapihandlerpush_get_request_content(self):
+        print('*** Running test_commcareapihandlerpush_get_request_content ***')
         test_data = [
             {
                 'name': 'test_specifier_1',
@@ -141,15 +142,15 @@ class TestCommCareAPIHandlerPush(unittest.TestCase):
         ]
 
         def test_function(self, test_case):
-            post_content = self.api._get_post_content(
+            request_content = self.api._get_request_content(
                 test_case['parameters']['specifier']
             )
             if test_case['return_value'] is None:
-                self.assertIsNone(post_content)
+                self.assertIsNone(request_content)
             else:
                 self.assertListEqual(
                     test_case['return_value'],
-                    post_content
+                    request_content
                 )
 
         run_test_cases(self, test_data, test_function)
@@ -161,6 +162,7 @@ class TestCommCareAPIHandlerPush(unittest.TestCase):
                 'name': 'test_specifier_1',
                 'parameters': {
                     'data_type': {
+                        'method': POST,
                         'version': 'test_version',
                         'name': 'test_name'
                     },
@@ -173,6 +175,7 @@ class TestCommCareAPIHandlerPush(unittest.TestCase):
                 'name': 'test_specifier_2',
                 'parameters': {
                     'data_type': {
+                        'method': POST,
                         'version': 'test_version',
                         'name': 'test_name'
                     },
@@ -185,6 +188,7 @@ class TestCommCareAPIHandlerPush(unittest.TestCase):
                 'name': 'test_specifier_missing',
                 'parameters': {
                     'data_type': {
+                        'method': POST,
                         'version': 'test_version',
                         'name': 'test_name'
                     },
@@ -210,6 +214,7 @@ class TestCommCareAPIHandlerPush(unittest.TestCase):
                 'name': 'test_specifier_1',
                 'parameters': {
                     'data_type': {
+                        'method': POST,
                         'version': 'test_version',
                         'name': 'test_name'
                     },
@@ -222,6 +227,7 @@ class TestCommCareAPIHandlerPush(unittest.TestCase):
                 'name': 'test_specifier_2',
                 'parameters': {
                     'data_type': {
+                        'method': 'PATCH',
                         'version': 'test_version',
                         'name': 'test_name'
                     },
@@ -234,6 +240,7 @@ class TestCommCareAPIHandlerPush(unittest.TestCase):
                 'name': 'test_specifier_missing',
                 'parameters': {
                     'data_type': {
+                        'method': POST,
                         'version': 'test_version',
                         'name': 'test_name'
                     },

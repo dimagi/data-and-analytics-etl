@@ -1,3 +1,4 @@
+from testing.const import POST
 from testing.util import MockResponse
 
 
@@ -18,9 +19,11 @@ def mock_get(url, headers, params):
     return response
 
 
-def mock_post(url, headers, json):
-    json_data = {
-        'form_id': 'test'
-    }
+def mock_request(method, url, headers, json):
+    json_data = {}
+    if method == POST:
+        json_data = {
+            'form_id': 'test'
+        }
     response = MockResponse(json_data=json_data)
     return response

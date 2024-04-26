@@ -12,7 +12,6 @@ DateRangeTuple = namedtuple('DateRangeTuple', ['start_time', 'end_time'])
 
 def err(msg):
     print(f"Error: {msg}")
-    exit()
     return {
             'statusCode': 400,
             'body': json.dumps({'message': msg})
@@ -24,10 +23,7 @@ def lambda_handler(event, context):
 
     # Load domain passed in by Eventbridge
     domain = event['domain']
-
     print(f"Processing domain: {domain}...")
-    api_token_for_domain = get_api_token(domain)
-    print("Got API token for domain.")
     
     if 'operation_type' not in event:
         return err('Operation type was not specified in event data.')
@@ -38,6 +34,9 @@ def lambda_handler(event, context):
 
     ## -- S3 to CommCare
     if event['operation_type'] == 'cc_to_s3':
+
+        api_token_for_domain = get_api_token(domain)
+        print("Got API token for domain.")
 
         # Custom date range processing
         if 'custom_date_range' in event:
@@ -62,12 +61,12 @@ def lambda_handler(event, context):
 
     ## -- CommCare to S3
     elif event['operation_type'] == 's3_to_cc':
-        if 'api_info' not in event or 'specifiers' not in event:
-            return err('api_info or specifiers were missing in event data.')
-        specifiers = event['specifiers']
-        for specifier in specifiers:
+        if 'specifiers' not in event:
+            return err('"specifiers" were missing in event data.')
+        specifier_data = event['specifiers']
+        for specifier in specifier_data:
             api_token_for_domain = get_api_token(domain, specifier=specifier)
-            CommCareAPIHandlerPush(domain, api_token_for_domain, event_time, request_limit=1000, test_mode=test_mode).push_data_for_domain(event['api_info'], specifier)
+            CommCareAPIHandlerPush(domain, api_token_for_domain, event_time, request_limit=1000, test_mode=test_mode).push_data_for_domain(specifier_data[specifier], specifier)
 
         print(f"Data push for domain: {domain} finished.")
         return {
@@ -77,4 +76,3 @@ def lambda_handler(event, context):
 
     else:
         return err("Invalid operation_type was provided.")
-    
