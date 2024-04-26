@@ -76,4 +76,3 @@ def lambda_handler(event, context):
 
     else:
         return err("Invalid operation_type was provided.")
-    

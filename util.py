@@ -1,4 +1,5 @@
 import boto3
+from requests.exceptions import JSONDecodeError
 ssm_client = boto3.client('ssm')
 
 class APIError(Exception):
@@ -16,7 +17,11 @@ def process_response(response, is_boto=False):
     elif response.ok:
         return response.json()
     else:
-        raise APIError(f"Request failed! Code: {response.status_code}. Reason: {response.reason}", response.status_code)
+        try:
+            error = APIError(f"Request failed! Code: {response.status_code}. Reason: {response.reason}. Details: {response.json()}", response.status_code)
+        except JSONDecodeError:
+            error = APIError(f"Request failed! Code: {response.status_code}.", response.status_code)
+        raise error
 
 def get_value_from_parameter_store(param_name):
     print(f"Getting value from parameter store with name: {param_name}")
