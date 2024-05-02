@@ -1,4 +1,4 @@
-name: lambda-deploy-commcare-s3-etl-bha-dev
+name: lambda-deploy-commcare-s3-etl-bha-train
 
 on: workflow_dispatch
 
@@ -20,8 +20,8 @@ jobs:
     - name: Deploy Files
       run: |
         S3_BUCKET=lambda-function-deploy-zip
-        S3_KEY=lambda-deploy-data-and-analytics-etl-bha-dev.zip
-        LAMBDA_FUNCTION_NAME=commcare-s3-etl-bha-dev
+        S3_KEY=lambda-deploy-data-and-analytics-etl-bha-train.zip
+        LAMBDA_FUNCTION_NAME=commcare-s3-etl-bha-train
         # the following will only look for .py files in the current dir (no folder)
         zip -r updated_lambda.zip *.py
         # Upload the updated zip to S3
