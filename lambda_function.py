@@ -40,18 +40,20 @@ def lambda_handler(event, context):
 
         # Custom date range processing
         if 'custom_date_range' in event:
+            use_lag = False
             custom_date_range_config = event['custom_date_range']
             custom_date_range_tuple = DateRangeTuple(datetime.strptime(custom_date_range_config['start_time'], "%Y-%m-%dT%H:%M:%S.%fZ"),
                 datetime.strptime(custom_date_range_config['end_time'], "%Y-%m-%dT%H:%M:%S.%fZ"))
             print(f"Specific date range specified. Details: {custom_date_range_tuple}")
         else:
+            use_lag = event.get('use_lag') != 0
             custom_date_range_tuple = None
         
         if 'api_info' not in event:
             return err('api_details was missing in event data.')
     
         CommCareAPIHandlerPull(domain, api_token_for_domain, event_time, request_limit=1000,
-            custom_date_range_config=custom_date_range_tuple, test_mode=test_mode).pull_data_for_domain(event['api_info'])
+            custom_date_range_config=custom_date_range_tuple, test_mode=test_mode, use_lag=use_lag).pull_data_for_domain(event['api_info'])
         
         print(f"Data pull for domain: {domain} finished.")
         return {
