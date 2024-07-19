@@ -1,6 +1,6 @@
 import boto3
 from botocore.exceptions import ClientError
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 import requests
 from const import CASE
@@ -11,7 +11,7 @@ main_bucket_name = 'commcare-snowflake-data-sync'
 s3 = boto3.client('s3')
 
 class CommCareAPIHandler:
-    def __init__(self, domain, api_token_for_domain, event_time, request_limit=100, custom_date_range_config=None, test_mode=False):
+    def __init__(self, domain, api_token_for_domain, event_time, request_limit=100, custom_date_range_config=None, test_mode=False, use_lag=False):
         self.domain = domain
         self.api_token = api_token_for_domain
         self.event_time = event_time
@@ -47,6 +47,12 @@ class CommCareAPIHandler:
 
 
 class CommCareAPIHandlerPull(CommCareAPIHandler):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if kwargs['use_lag']:
+            self.event_time = self.event_time - timedelta(hours=0, minutes=5)
+            print("Added a 5 minute lag.")
 
     def filepath(self, data_type):
         path_beginning = f"{self.domain}/snowflake-copy/"
