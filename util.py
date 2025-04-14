@@ -12,7 +12,7 @@ def process_response(response, is_boto=False):
     # The python requests library is assumed to be default
     if is_boto:
         status_code = response['ResponseMetadata']['HTTPStatusCode']
-        if status_code != 200:
+        if not (200 <= status_code < 300):
             raise Exception(f"Boto3 request failed! Code: {status_code}.")
     elif response.ok:
         return response.json()
