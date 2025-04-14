@@ -57,6 +57,12 @@ class CommCareAPIHandler:
 
 class CommCareAPIHandlerPull(CommCareAPIHandler):
 
+    # Snowflake pipeline can only handle file sizes 16MB or less
+    max_file_size_in_mb = 16
+    # File sizes often vary in size due to natural variety in size of cases, forms, etc. This offset
+    #   provides room for instances where there are coincidentally large cases or forms in the request.
+    file_size_grace_offset = 0.50
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if kwargs['use_lag']:
@@ -91,6 +97,47 @@ class CommCareAPIHandlerPull(CommCareAPIHandler):
         s3.put_object(Body=str(time), Bucket=main_bucket_name, Key=filepath)
         print(f"Run time saved.")
 
+    def _save_api_limit(self, data_type_name, limit):
+        filepath = self._get_stored_param_filepath('api_limit', data_type_name)
+        print(f"Saving new API limit of {data_type_name} pull on domain {self.domain} with filename: {filepath}...")
+        s3.put_object(Body=str(limit), Bucket=main_bucket_name, Key=filepath)
+        print(f"API limit saved. New value: {limit}.")
+
+    def _get_api_limit(self, data_type, start_time, end_time):
+        print(f"Verifying api limit for {data_type['name']} run on domain {self.domain}...")
+        current_limit = data_type['limit']
+        try:
+            current_limit = self._get_current_api_limit(data_type['name'])
+        except ClientError as e:
+            if e.response['Error']['Code'] == 'NoSuchKey':
+                print(f"No stored api limit found (no .txt file).")
+            else:
+                raise
+        new_limit = self._determine_new_api_limit(data_type, current_limit, start_time, end_time)
+        self._save_api_limit(data_type['name'], new_limit)
+        return new_limit
+
+    def _determine_new_api_limit(self, data_type, current_limit, start_time, end_time):
+        print(f"Testing current api limit: {current_limit}...")
+        api_url = self.api_base_url(data_type)
+        params = {
+            "limit": current_limit
+        }
+        params = self._get_indexing_params(params, data_type, start_time, end_time)
+        print(f"Making request to URL: {api_url} with parameters: {params}.")
+        response = requests.get(api_url, headers=self.api_call_headers(), params=params)
+        response_data = process_response(response)
+        size_in_bytes = len(json.dumps(response_data).encode('utf-8'))
+        size_in_mb = size_in_bytes / 1000000
+        print(f"Calculated file size with current limit to be: {size_in_mb}MB.")
+        return self._calculate_new_api_limit(size_in_mb, current_limit)
+
+    def _calculate_new_api_limit(self, size_in_mb, current_limit):
+        new_appropriate_limit = (self.max_file_size_in_mb / size_in_mb) * float(current_limit)
+        new_limit = int(new_appropriate_limit * self.file_size_grace_offset)
+        print(f"New appropriate limit calculated to be: {new_limit}.")
+        return new_limit
+
     def get_date_range(self, data_type):
         if self.custom_date_range_config:
             return (self.custom_date_range_config.start_time.isoformat(), self.custom_date_range_config.end_time.isoformat())
@@ -98,10 +145,19 @@ class CommCareAPIHandlerPull(CommCareAPIHandler):
             return (self._get_last_job_success_time(data_type['name']), self.event_time.isoformat())
 
     def get_initial_parameters_for_data_type(self, data_type, start_time, end_time):
-        params = {
-            'limit': data_type['limit']
-        }
+        params = {}
+        if data_type.get('auto_determine_limit'):
+            params.update({
+                'limit': self._get_api_limit(data_type, start_time, end_time)
+            })
+        else:
+            params.update({
+                'limit': data_type['limit']
+            })
+        params = self._get_indexing_params(params, data_type, start_time, end_time)
+        return params
 
+    def _get_indexing_params(self, params, data_type, start_time, end_time):
         if data_type.get('uses_indexed_on'):
             if data_type['name'] == 'form':
                 params.update({
@@ -118,7 +174,6 @@ class CommCareAPIHandlerPull(CommCareAPIHandler):
                     'UTC_start_time_start': start_time,
                     'UTC_start_time_end': end_time,
                 })
-
         return params
     
     def store_in_s3(self, cc_api_data_type, response_data, filename):
