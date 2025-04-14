@@ -7,11 +7,14 @@ from const import CASE
 from util import APIError, process_response
 
 main_bucket_name = 'commcare-snowflake-data-sync'
+base_commcare_url = 'https://www.commcarehq.org'
+base_staging_url = 'https://staging.commcarehq.org'
 
 s3 = boto3.client('s3')
 
 class CommCareAPIHandler:
-    def __init__(self, domain, api_token_for_domain, event_time, request_limit=100, custom_date_range_config=None, test_mode=False, use_lag=False):
+    def __init__(self, is_staging, domain, api_token_for_domain, event_time, request_limit=100, custom_date_range_config=None, test_mode=False, use_lag=False):
+        self.is_staging = is_staging
         self.domain = domain
         self.api_token = api_token_for_domain
         self.event_time = event_time
@@ -27,7 +30,13 @@ class CommCareAPIHandler:
         return f"{self.__class__.__name__}({', '.join(attribute_strings)})"
 
     def api_base_url(self, data_type):
-        return f"https://www.commcarehq.org/a/{self.domain}/api/{data_type['version']}/{data_type['name']}/"
+        request_domain = self.domain
+        if self.is_staging:
+            domain_url = base_staging_url
+            request_domain = request_domain.replace('staging-', '')
+        else:
+            domain_url = base_commcare_url
+        return f"{domain_url}/a/{request_domain}/api/{data_type['version']}/{data_type['name']}/"
 
     def api_call_headers(self):
         return {'Content-Type':'application/json', 'Authorization' : f'ApiKey {self.api_token}'}
