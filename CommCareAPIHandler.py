@@ -67,14 +67,29 @@ class CommCareAPIHandlerPull(CommCareAPIHandler):
         path_beginning = f"{self.domain}/snowflake-copy/"
         return path_beginning + data_type + ("-test" if self.test_mode else "") + f"/{self.event_time.strftime('%Y')}/{self.event_time.strftime('%m')}/{self.event_time.strftime('%d')}/{self.event_time.strftime('%H')}/"
 
+    def _get_stored_param_filepath(self, stored_parameter_name, data_type_name):
+        return f"{self.domain}/snowflake-copy/{data_type_name}" + ("-test" if self.test_mode else "") + f"/{stored_parameter_name}.txt"
+
+    def _get_stored_param_from_s3(self, stored_parameter_name, data_type_name):
+        return s3.get_object(Bucket=main_bucket_name, Key=self._get_stored_param_filepath(stored_parameter_name, data_type_name))['Body'].read().decode("utf-8")
+
     def _get_last_job_success_time(self, data_type_name):
         print(f"Loading last successful job time for {data_type_name} run on domain {self.domain}...")
-        last_successful_job_time = s3.get_object(Bucket=main_bucket_name, Key=self._last_job_success_time_filepath(data_type_name))['Body'].read().decode("utf-8")
-        print("Load successful.")
+        last_successful_job_time = self._get_stored_param_from_s3('last_successful_job_time', data_type_name)
+        print(f"Load successful. Last successful job time was: {last_successful_job_time}.")
         return last_successful_job_time
 
-    def _last_job_success_time_filepath(self, data_type_name):
-        return f"{self.domain}/snowflake-copy/{data_type_name}" + ("-test" if self.test_mode else "") + "/last_successful_job_time.txt"
+    def _get_current_api_limit(self, data_type_name):
+        print(f"Loading current API limit for {data_type_name} run on domain {self.domain}...")
+        api_limit = self._get_stored_param_from_s3('api_limit', data_type_name)
+        print(f"Load successful. Current API limit is: {api_limit}.")
+        return api_limit
+
+    def _save_run_time(self, data_type_name, time):
+        filepath = self._get_stored_param_filepath('last_successful_job_time', data_type_name)
+        print(f"Saving run time of {data_type_name} pull on domain {self.domain} with filename: {filepath}. Run time: {str(time)}...")
+        s3.put_object(Body=str(time), Bucket=main_bucket_name, Key=filepath)
+        print(f"Run time saved.")
 
     def get_date_range(self, data_type):
         if self.custom_date_range_config:
@@ -168,18 +183,15 @@ class CommCareAPIHandlerPull(CommCareAPIHandler):
         if not self.custom_date_range_config:
             self._save_run_time(data_type_name, self.event_time.isoformat())
 
-    def _save_run_time(self, data_type_name, time):
-        print(f"Saving run time of {data_type_name} pull on domain {self.domain} with filename: {self._last_job_success_time_filepath(data_type_name)}...")
-        s3.put_object(Body=str(time), Bucket=main_bucket_name, Key=self._last_job_success_time_filepath(data_type_name))
-        print(f"Run time saved.")
-
     def pull_data_for_domain(self, api_details):
         for data_type_name in api_details.keys():
             try:
                 self._perform_method(self.pull_data, api_details[data_type_name])
             except ClientError as e:
                 if e.response['Error']['Code'] == 'NoSuchKey':
-                    print(f"No last successful job time was provided via the txt file. Skipping processing for data_type: {data_type_name}...")
+                    print(f"Missing stored parameter (i.e. last successful job time, api limit) txt file. Skipping processing for data_type: {data_type_name}...")
+                else:
+                    raise
 
 class CommCareAPIHandlerPush(CommCareAPIHandler):
     def filepath(self, specifier):
