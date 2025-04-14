@@ -41,6 +41,7 @@ class TestCommCareAPIHandler(unittest.TestCase):
             {
                 'name': 'test_default_init',
                 'api': CommCareAPIHandler(
+                    False,
                     'test_domain',
                     'test_domain-api-key',
                     datetime.strptime(
@@ -64,6 +65,7 @@ class TestCommCareAPIHandler(unittest.TestCase):
             {
                 'name': 'test_custom_init',
                 'api': CommCareAPIHandler(
+                    False,
                     'test_domain',
                     'test_domain-api-key',
                     datetime.strptime(
@@ -104,6 +106,7 @@ class TestCommCareAPIHandler(unittest.TestCase):
             {
                 'name': 'test_default_api_base_url',
                 'api': CommCareAPIHandler(
+                    False,
                     'test_domain',
                     'test_domain-api-key',
                     datetime.strptime(
@@ -141,6 +144,7 @@ class TestCommCareAPIHandler(unittest.TestCase):
             {
                 'name': 'test_under_api_error_threshold',
                 'api': CommCareAPIHandler(
+                    False,
                     'test_domain',
                     'test_domain-api-key',
                     datetime.strptime(
@@ -156,6 +160,7 @@ class TestCommCareAPIHandler(unittest.TestCase):
             {
                 'name': 'test_above_api_error_threshold',
                 'api': CommCareAPIHandler(
+                    False,
                     'test_domain',
                     'test_domain-api-key',
                     datetime.strptime(
