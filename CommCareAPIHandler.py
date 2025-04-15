@@ -57,11 +57,19 @@ class CommCareAPIHandler:
 
 class CommCareAPIHandlerPull(CommCareAPIHandler):
 
+    """
+        Pulls a set of data from CommCareHQ through a series of API requests and outputs the contents of those
+        requests as files in S3.
+    """
+
+    # --- Automatically-determined API limit variables
     # Snowflake pipeline can only handle file sizes 16MB or less
     max_file_size_in_mb = 16
     # File sizes often vary in size due to natural variety in size of cases, forms, etc. This offset
     #   provides room for instances where there are coincidentally large cases or forms in the request.
     file_size_grace_offset = 0.50
+    max_limit = 10000
+    # ---
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -74,36 +82,57 @@ class CommCareAPIHandlerPull(CommCareAPIHandler):
         return path_beginning + data_type + ("-test" if self.test_mode else "") + f"/{self.event_time.strftime('%Y')}/{self.event_time.strftime('%m')}/{self.event_time.strftime('%d')}/{self.event_time.strftime('%H')}/"
 
     def _get_stored_param_filepath(self, stored_parameter_name, data_type_name):
+        """
+            Example file path: "co-carecoordination-test/snowflake-copy/case/last_successful_job_time.txt"
+        """
         return f"{self.domain}/snowflake-copy/{data_type_name}" + ("-test" if self.test_mode else "") + f"/{stored_parameter_name}.txt"
 
     def _get_stored_param_from_s3(self, stored_parameter_name, data_type_name):
+        """
+            Get a parameter that's stored as a .txt file with the given name, in S3.
+        """
         return s3.get_object(Bucket=main_bucket_name, Key=self._get_stored_param_filepath(stored_parameter_name, data_type_name))['Body'].read().decode("utf-8")
 
     def _get_last_job_success_time(self, data_type_name):
+        """
+            Gets the time the Lambda function was last successfully excecuted for the given data type.
+        """
         print(f"Loading last successful job time for {data_type_name} run on domain {self.domain}...")
         last_successful_job_time = self._get_stored_param_from_s3('last_successful_job_time', data_type_name)
         print(f"Load successful. Last successful job time was: {last_successful_job_time}.")
         return last_successful_job_time
 
     def _get_current_api_limit(self, data_type_name):
+        """
+            Gets the stored API limit for this data type from S3, if there is one saved.
+        """
         print(f"Loading current API limit for {data_type_name} run on domain {self.domain}...")
         api_limit = self._get_stored_param_from_s3('api_limit', data_type_name)
         print(f"Load successful. Current API limit is: {api_limit}.")
         return api_limit
 
     def _save_run_time(self, data_type_name, time):
+        """
+            Save the last successful run time for this data type in S3.
+        """
         filepath = self._get_stored_param_filepath('last_successful_job_time', data_type_name)
         print(f"Saving run time of {data_type_name} pull on domain {self.domain} with filename: {filepath}. Run time: {str(time)}...")
         s3.put_object(Body=str(time), Bucket=main_bucket_name, Key=filepath)
         print(f"Run time saved.")
 
     def _save_api_limit(self, data_type_name, limit):
+        """
+            Save the calculated API limit for this data type in S3.
+        """
         filepath = self._get_stored_param_filepath('api_limit', data_type_name)
         print(f"Saving new API limit of {data_type_name} pull on domain {self.domain} with filename: {filepath}...")
         s3.put_object(Body=str(limit), Bucket=main_bucket_name, Key=filepath)
         print(f"API limit saved. New value: {limit}.")
 
     def _get_api_limit(self, data_type, start_time, end_time):
+        """
+            Returns a new appropriate API limit for the given data type.
+        """
         print(f"Verifying api limit for {data_type['name']} run on domain {self.domain}...")
         current_limit = data_type['limit']
         try:
@@ -118,6 +147,10 @@ class CommCareAPIHandlerPull(CommCareAPIHandler):
         return new_limit
 
     def _determine_new_api_limit(self, data_type, current_limit, start_time, end_time):
+        """
+            Calculates the appropriate API limit for this data type, based on the file size of
+            a test request made to the API.
+        """
         print(f"Testing current api limit: {current_limit}...")
         api_url = self.api_base_url(data_type)
         params = {
@@ -133,6 +166,12 @@ class CommCareAPIHandlerPull(CommCareAPIHandler):
         return self._calculate_new_api_limit(size_in_mb, current_limit)
 
     def _calculate_new_api_limit(self, size_in_mb, current_limit):
+        """
+            Example: if the maximum file size is 16MB, and a request with the current limit to the API returns a
+            file size of 8 MB, the new limit is 16 / 8 * the current limit * the grace offset. The grace
+            offset gives breathing room below the maxiumum file size so that a possibly larger request using the
+            same limit does not go over the maximum file size.
+        """
         new_appropriate_limit = (self.max_file_size_in_mb / size_in_mb) * float(current_limit)
         new_limit = int(new_appropriate_limit * self.file_size_grace_offset)
         print(f"New appropriate limit calculated to be: {new_limit}.")
@@ -145,6 +184,9 @@ class CommCareAPIHandlerPull(CommCareAPIHandler):
             return (self._get_last_job_success_time(data_type['name']), self.event_time.isoformat())
 
     def get_initial_parameters_for_data_type(self, data_type, start_time, end_time):
+        """
+            Gets API request parameters for a given data type.
+        """
         params = {}
         if data_type.get('auto_determine_limit'):
             params.update({
@@ -158,6 +200,9 @@ class CommCareAPIHandlerPull(CommCareAPIHandler):
         return params
 
     def _get_indexing_params(self, params, data_type, start_time, end_time):
+        """
+            Gets the API request parameters related to indexing.
+        """
         if data_type.get('uses_indexed_on'):
             if data_type['name'] == 'form':
                 params.update({
