@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 import json
 import requests
 from const import CASE
-from util import APIError, process_response
+from util import APIError, APILimitCalculator, process_response
 
 main_bucket_name = 'commcare-snowflake-data-sync'
 base_commcare_url = 'https://www.commcarehq.org'
@@ -61,15 +61,6 @@ class CommCareAPIHandlerPull(CommCareAPIHandler):
         Pulls a set of data from CommCareHQ through a series of API requests and outputs the contents of those
         requests as files in S3.
     """
-
-    # --- Automatically-determined API limit variables
-    # Snowflake pipeline can only handle file sizes 16MB or less
-    max_file_size_in_mb = 16
-    # File sizes often vary in size due to natural variety in size of cases, forms, etc. This offset
-    #   provides room for instances where there are coincidentally large cases or forms in the request.
-    file_size_grace_offset = 0.50
-    max_limit = 10000
-    # ---
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -131,7 +122,8 @@ class CommCareAPIHandlerPull(CommCareAPIHandler):
 
     def _get_api_limit(self, data_type, start_time, end_time):
         """
-            Returns a new appropriate API limit for the given data type.
+            Tests an existing API limit and returns a new appropriate API limit for the given data type,
+            utilizing the APILimitCalculator helper class.
         """
         print(f"Verifying api limit for {data_type['name']} run on domain {self.domain}...")
         current_limit = data_type['limit']
@@ -142,14 +134,14 @@ class CommCareAPIHandlerPull(CommCareAPIHandler):
                 print(f"No stored api limit found (no .txt file).")
             else:
                 raise
-        new_limit = self._determine_new_api_limit(data_type, current_limit, start_time, end_time)
+        size_of_test_request_in_bytes = self._test_api_limit(data_type, current_limit, start_time, end_time)
+        new_limit = APILimitCalculator.determine_new_api_limit(current_limit, size_of_test_request_in_bytes)
         self._save_api_limit(data_type['name'], new_limit)
         return new_limit
 
-    def _determine_new_api_limit(self, data_type, current_limit, start_time, end_time):
+    def _test_api_limit(self, data_type, current_limit, start_time, end_time):
         """
-            Calculates the appropriate API limit for this data type, based on the file size of
-            a test request made to the API.
+            Performs an initial test request of an api limit, returning the size in bytes.
         """
         print(f"Testing current api limit: {current_limit}...")
         api_url = self.api_base_url(data_type)
@@ -161,21 +153,7 @@ class CommCareAPIHandlerPull(CommCareAPIHandler):
         response = requests.get(api_url, headers=self.api_call_headers(), params=params)
         response_data = process_response(response)
         size_in_bytes = len(json.dumps(response_data).encode('utf-8'))
-        size_in_mb = size_in_bytes / 1000000
-        print(f"Calculated file size with current limit to be: {size_in_mb}MB.")
-        return self._calculate_new_api_limit(size_in_mb, current_limit)
-
-    def _calculate_new_api_limit(self, size_in_mb, current_limit):
-        """
-            Example: if the maximum file size is 16MB, and a request with the current limit to the API returns a
-            file size of 8 MB, the new limit is 16 / 8 * the current limit * the grace offset. The grace
-            offset gives breathing room below the maxiumum file size so that a possibly larger request using the
-            same limit does not go over the maximum file size.
-        """
-        new_appropriate_limit = (self.max_file_size_in_mb / size_in_mb) * float(current_limit)
-        new_limit = int(new_appropriate_limit * self.file_size_grace_offset)
-        print(f"New appropriate limit calculated to be: {new_limit}.")
-        return new_limit
+        return size_in_bytes
 
     def get_date_range(self, data_type):
         if self.custom_date_range_config:
