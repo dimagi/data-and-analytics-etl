@@ -85,7 +85,7 @@ class TestUtil(unittest.TestCase):
                 'return_value': None,
                 'expect_exception': True,
                 'exception': util.APIError(
-                    "Request failed! Code: 400. Reason: Test", 400)
+                    "Request failed! Code: 400. Reason: Test. Details: {}", 400)
             }
         ]
 
