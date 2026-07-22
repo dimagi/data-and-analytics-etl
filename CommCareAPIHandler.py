@@ -6,7 +6,7 @@ import requests
 from const import CASE
 from util import APIError, APILimitCalculator, process_response
 
-main_bucket_name = 'commcare-snowflake-data-sync'
+main_bucket_name = 'uss-matt-onboarding-commcare-data-sync'
 base_commcare_url = 'https://www.commcarehq.org'
 base_staging_url = 'https://staging.commcarehq.org'
 
