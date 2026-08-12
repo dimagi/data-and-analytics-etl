@@ -21,10 +21,14 @@ def lambda_handler(event, context):
     event_time = datetime.now()
     print(f"Loaded current event time: {event_time}.")
 
-    # Load domain passed in by Eventbridge
+    # -- Parse parameters from event payload
     domain = event['domain']
     print(f"Processing domain: {domain}...")
-    
+
+    is_staging = event.get('is_staging')
+    if is_staging:
+        print("Noticed that this is a staging domain...")
+
     if 'operation_type' not in event:
         return err('Operation type was not specified in event data.')
 
@@ -52,7 +56,7 @@ def lambda_handler(event, context):
         if 'api_info' not in event:
             return err('api_details was missing in event data.')
     
-        CommCareAPIHandlerPull(domain, api_token_for_domain, event_time, request_limit=1000,
+        CommCareAPIHandlerPull(is_staging, domain, api_token_for_domain, event_time, request_limit=1000,
             custom_date_range_config=custom_date_range_tuple, test_mode=test_mode, use_lag=use_lag).pull_data_for_domain(event['api_info'])
         
         print(f"Data pull for domain: {domain} finished.")
@@ -68,7 +72,7 @@ def lambda_handler(event, context):
         specifier_data = event['specifiers']
         for specifier in specifier_data:
             api_token_for_domain = get_api_token(domain, specifier=specifier)
-            CommCareAPIHandlerPush(domain, api_token_for_domain, event_time, request_limit=1000, test_mode=test_mode).push_data_for_domain(specifier_data[specifier], specifier)
+            CommCareAPIHandlerPush(is_staging, domain, api_token_for_domain, event_time, request_limit=1000, test_mode=test_mode).push_data_for_domain(specifier_data[specifier], specifier)
 
         print(f"Data push for domain: {domain} finished.")
         return {

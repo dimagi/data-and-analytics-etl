@@ -69,6 +69,7 @@ class TestCommCareAPIHandlerPush(unittest.TestCase):
     def __init__(self, methodName):
         super().__init__(methodName)
         self.api = CommCareAPIHandlerPush(
+            False,
             'test_domain',
             'test_domain-api-key',
             datetime.strptime(
